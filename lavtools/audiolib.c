@@ -634,9 +634,9 @@ int audio_write(uint8_t *buf, int size, int swap)
 static void system_error(const char *str, int fd, int use_strerror)
 {
    if (use_strerror)
-      snprintf((char*)shmemptr->error_string, sizeof (shmemptr->error_string), "Error: %s - %s",strerror(errno),str);
+      sprintf((char*)shmemptr->error_string, "Error: %s - %s",strerror(errno),str);
    else
-      snprintf((char*)shmemptr->error_string, sizeof (shmemptr->error_string), "Error: %s",str);
+      sprintf((char*)shmemptr->error_string, "Error: %s",str);
 
    shmemptr->audio_status = -1;
    if (fd >= 0)
@@ -669,9 +669,23 @@ void do_audio(void)
    struct sched_param schedparam;
    sigset_t blocked_signals;
 
-   sigaddset( &blocked_signals, SIGINT );
-   if (pthread_sigmask( SIG_BLOCK, &blocked_signals, NULL))
-      system_error( "Bad pthread_sigmask", fd, 0);
+   /* Set the capture thread in a reasonable state - cancellation enabled
+      and asynchronous, SIGINT's ignored... */
+   /* PTHREAD_CANCEL_ASYNCHRONOUS is evil. */
+   /*   if( pthread_setcancelstate( PTHREAD_CANCEL_ENABLE, NULL) )
+   {
+      system_error( "Bad pthread_setcancelstate", fd, 0 );
+   }
+   if( pthread_setcanceltype( PTHREAD_CANCEL_ASYNCHRONOUS, NULL) )
+   {
+      system_error( "Bad pthread_setcanceltype", fd, 0 );
+   }*/
+
+    sigaddset( &blocked_signals, SIGINT );
+   if( pthread_sigmask( SIG_BLOCK, &blocked_signals, NULL ))
+   {
+      system_error( "Bad pthread_sigmask", fd, 0 );
+   }
 #endif
 
 /*
@@ -696,9 +710,7 @@ void do_audio(void)
  */
 
    audio_dev_name = getenv("LAV_AUDIO_DEV");
-   if (!audio_dev_name) audio_dev_name = "/dev/dsp";
-
-   if (strlen(audio_dev_name) > 2048) audio_dev_name = "/dev/dsp";
+   if(!audio_dev_name) audio_dev_name = "/dev/dsp";
 
    if(audio_capt)
       fd=open(audio_dev_name, O_RDONLY, 0);
